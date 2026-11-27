@@ -57,7 +57,7 @@ pub fn set_art(image: &gtk::Image, state: &State, track: Option<&Track>) {
 pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindow, Rc<dyn Fn()>) {
     // --- Sidebar -------------------------------------------------------------------
     let nav = gtk::ListBox::new();
-    nav.add_css_class("navigation-sidebar");
+    nav.add_css_class("aco-navigation");
     for (icon, label, name) in [
         ("audio-x-generic-symbolic", "Alle Titel", "all"),
         ("media-optical-symbolic", "Alben", "albums"),
@@ -65,9 +65,6 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
     ] {
         let row_box = gtk::Box::builder()
             .spacing(12)
-            .margin_top(6)
-            .margin_bottom(6)
-            .margin_start(6)
             .build();
         row_box.append(&gtk::Image::from_icon_name(icon));
         row_box.append(&gtk::Label::new(Some(label)));
@@ -78,13 +75,18 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
                 .build(),
         );
     }
+    let library = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    library.add_css_class("aco-rail");
+    library.append(&gtk::Label::builder().label("Mediathek").xalign(0.0).css_classes(["aco-nav-heading"]).build());
+    library.append(&nav);
     let sidebar_view = adw::ToolbarView::new();
     sidebar_view.add_top_bar(
         &adw::HeaderBar::builder()
             .show_end_title_buttons(false)
+            .css_classes(["aco-titlebar"])
             .build(),
     );
-    sidebar_view.set_content(Some(&nav));
+    sidebar_view.set_content(Some(&library));
     let sidebar = adw::NavigationPage::builder()
         .title("Musik")
         .child(&sidebar_view)
@@ -107,11 +109,11 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
         .build();
     let play_all = gtk::Button::builder()
         .label("Abspielen")
-        .css_classes(["pill", "suggested-action"])
+        .css_classes(["aco-primary"])
         .build();
     let shuffle_all = gtk::Button::builder()
         .label("Zufällig")
-        .css_classes(["pill"])
+        .css_classes(["aco-tool"])
         .build();
     let buttons = gtk::Box::builder().spacing(12).margin_top(12).build();
     buttons.append(&play_all);
@@ -210,7 +212,7 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
     let back = aco_common::icon_button("go-previous-symbolic", "Zurück");
     back.set_visible(false);
     let open = aco_common::icon_button("document-open-symbolic", "Dateien öffnen");
-    let content_header = adw::HeaderBar::new();
+    let content_header = adw::HeaderBar::builder().css_classes(["aco-titlebar"]).build();
     content_header.pack_start(&back);
     content_header.set_title_widget(Some(&search));
     content_header.pack_end(&open);
@@ -363,6 +365,14 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
             }
         }
     });
+    nav.connect_row_activated({
+        let split = split.downgrade();
+        move |_, _| {
+            if let Some(split) = split.upgrade() {
+                split.set_show_content(true);
+            }
+        }
+    });
     ui.back.connect_clicked({
         let (ui, nav) = (ui.clone(), nav.clone());
         move |_| {
@@ -411,6 +421,7 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("Musik")
+        .css_classes(["aco-workspace"])
         .default_width(1120)
         .default_height(740)
         .content(&body)
@@ -424,6 +435,16 @@ pub fn build(app: &adw::Application, state: Rc<State>) -> (adw::ApplicationWindo
     breakpoint.add_setter(&split, "collapsed", Some(&true.to_value()));
     window.add_breakpoint(breakpoint);
 
+    aco_common::action(app, &window, "find", &["<Primary>f"], {
+        let (nav, split, search) = (nav.clone(), split.clone(), ui.search.clone());
+        move || {
+            if let Some(first) = nav.row_at_index(0) {
+                nav.select_row(Some(&first));
+            }
+            split.set_show_content(true);
+            search.grab_focus();
+        }
+    });
     open.connect_clicked({
         let (window, ui) = (window.clone(), ui.clone());
         move |_| {
@@ -490,9 +511,13 @@ impl Ui {
 
     /// Fill the list for the current view and search text, and its header.
     fn fill_tracks(&self) {
-        let query = self.search.text().to_lowercase();
         let tracks = self.state.tracks.borrow();
         let view = self.view.borrow().clone();
+        let query = if view == View::All {
+            self.search.text().trim().to_lowercase()
+        } else {
+            String::new()
+        };
         let rows: Vec<usize> = tracks
             .iter()
             .enumerate()

@@ -1,6 +1,6 @@
 # ACO Musik (`aco-music`)
 
-The music library and player of the ACO desktop: reads the music folder (tags and covers with lofty), albums, artists and search, a player bar and a compact mini player, and MPRIS, so the control centre's media card and the media keys steer it.
+The music library and player of the ACO desktop: reads the music folder (tags and covers with lofty), albums, artists and search, a player bar and a compact mini player, and MPRIS, so the control centre's media card and the media keys steer it. Press Ctrl+F to search the library from any view. The initial library scan keeps already queued files in order.
 
 Native app in Rust with GTK 4 and libadwaita: it follows the ACO theme (profile, light/dark, accent) through
 aco-gtk4 without code of its own, starts on demand and keeps nothing in the background. Shared parts (app start,

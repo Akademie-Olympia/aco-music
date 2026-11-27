@@ -92,7 +92,8 @@ fn main() -> glib::ExitCode {
             let (state_, refresh_) = (state.clone(), refresh.clone());
             glib::spawn_future_local(async move {
                 if let Ok(scan) = gio::spawn_blocking(move || library::scan(&music)).await {
-                    state_.load(scan);
+                    state_.add(scan);
+                    state_.changed();
                     refresh_();
                 }
             });

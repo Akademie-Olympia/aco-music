@@ -2,7 +2,7 @@
 //! library, the queue, shuffle and repeat, and the GStreamer player.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::rc::Rc;
 
 use aco_common::player::{Event, Player};
@@ -64,32 +64,15 @@ impl State {
         Ok(this)
     }
 
-    /// Replace the library with a scan (covers become textures once, here).
-    pub fn load(&self, scan: Scan) {
-        let mut covers = HashMap::new();
-        for (key, bytes) in &scan.covers {
-            if let Ok(texture) = gdk::Texture::from_bytes(&glib::Bytes::from(&bytes[..])) {
-                covers.insert(key.clone(), texture);
-            }
-        }
-        *self.covers.borrow_mut() = covers;
-        *self.cover_bytes.borrow_mut() = scan.covers;
-        *self.tracks.borrow_mut() = scan.tracks;
-        self.changed();
-    }
-
-    /// Add files that are not in the library (opened from the file manager).
+    /// Merge scanned tracks without changing any existing playback queue index.
     pub fn add(&self, scan: Scan) -> Vec<usize> {
-        let start = self.tracks.borrow().len();
         for (key, bytes) in scan.covers {
             if let Ok(texture) = gdk::Texture::from_bytes(&glib::Bytes::from(&bytes[..])) {
                 self.covers.borrow_mut().insert(key.clone(), texture);
             }
             self.cover_bytes.borrow_mut().insert(key, bytes);
         }
-        let count = scan.tracks.len();
-        self.tracks.borrow_mut().extend(scan.tracks);
-        (start..start + count).collect()
+        merge_tracks(&mut self.tracks.borrow_mut(), scan.tracks)
     }
 
     /// Call `f` whenever the current track or the playing state changes.
@@ -114,6 +97,9 @@ impl State {
 
     /// Play `tracks` (library indices) starting with `start`.
     pub fn play_list(&self, tracks: Vec<usize>, start: usize) {
+        if tracks.is_empty() {
+            return;
+        }
         let mut queue = tracks;
         let mut first = start.min(queue.len().saturating_sub(1));
         if self.shuffle.get() {
@@ -211,10 +197,64 @@ impl State {
     }
 }
 
+fn merge_tracks(tracks: &mut Vec<Track>, incoming: Vec<Track>) -> Vec<usize> {
+    let mut existing: HashMap<_, _> = tracks
+        .iter()
+        .enumerate()
+        .map(|(index, track)| (track.path.clone(), index))
+        .collect();
+    incoming
+        .into_iter()
+        .map(|track| match existing.entry(track.path.clone()) {
+            Entry::Occupied(entry) => {
+                let index = *entry.get();
+                tracks[index] = track;
+                index
+            }
+            Entry::Vacant(entry) => {
+                let index = tracks.len();
+                entry.insert(index);
+                tracks.push(track);
+                index
+            }
+        })
+        .collect()
+}
+
 /// Fisher–Yates with GLib's random numbers.
 fn shuffle<T>(items: &mut [T]) {
     for i in (1..items.len()).rev() {
         let j = glib::random_int_range(0, i as i32 + 1) as usize;
         items.swap(i, j);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_preserves_indices_for_tracks_opened_during_startup() {
+        let track = |path: &str, title: &str| Track {
+            path: path.into(),
+            title: title.into(),
+            artist: String::new(),
+            album: String::new(),
+            number: 0,
+            duration: 0.0,
+        };
+        let mut tracks = vec![
+            track("second.flac", "From file"),
+            track("outside.flac", "External"),
+        ];
+        let indices = merge_tracks(
+            &mut tracks,
+            vec![track("first.flac", "First"), track("second.flac", "Second")],
+        );
+
+        assert_eq!(indices, [2, 0]);
+        assert_eq!(tracks.len(), 3);
+        assert_eq!(tracks[0].title, "Second");
+        assert_eq!(tracks[1].title, "External");
     }
 }
