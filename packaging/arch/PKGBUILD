@@ -1,0 +1,33 @@
+# Native app: built from source with cargo, following the Arch Rust package guidelines.
+pkgname=aco-arch-dotfiles-music
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='ACO Musik: music library and player (Rust, GTK 4)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Akademie-Olympia/aco-music'
+license=('MIT')
+depends=('glibc' 'gcc-libs' 'gtk4' 'libadwaita' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good' 'gst-libav')
+makedepends=('cargo' 'git')
+optdepends=('gst-plugins-ugly: more audio formats')
+source=("aco-music::git+https://github.com/Akademie-Olympia/aco-music.git#branch=main")
+options=('!debug')
+sha256sums=('SKIP')
+
+prepare() {
+    cd aco-music
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd aco-music
+    export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+package() {
+    cd aco-music
+    install -Dm755 target/release/aco-music "$pkgdir/usr/bin/aco-music"
+    install -Dm644 -t "$pkgdir/usr/share/applications" data/*.desktop
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

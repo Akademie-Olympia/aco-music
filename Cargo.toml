@@ -1,0 +1,22 @@
+[package]
+name = "aco-music"
+version = "0.1.0"
+edition = "2021"
+description = "ACO Musik: music library and player"
+license = "MIT"
+publish = false
+
+[dependencies]
+adw = { version = "0.9.2", package = "libadwaita", features = ["v1_6"] }
+gtk = { version = "0.11.5", package = "gtk4", features = ["v4_14"] }
+aco-common = { git = "https://github.com/Akademie-Olympia/aco-common.git", features = ["player"] }
+gst = { version = "0.25.4", package = "gstreamer" }
+lofty = "0.25.5"
+
+[profile.release]
+# Small, fast binary: link-time optimisation, one codegen unit, no unwinding.
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

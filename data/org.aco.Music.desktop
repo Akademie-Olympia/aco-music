@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Musik
+GenericName=Musikplayer
+Comment=Musikbibliothek und Player
+Exec=aco-music %U
+Icon=multimedia-audio-player
+Terminal=false
+Categories=AudioVideo;Audio;Player;GTK;
+MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-vorbis+ogg;audio/opus;audio/mp4;audio/aac;audio/x-wav;audio/x-m4a;audio/x-aiff;
+Keywords=Music;Musik;MP3;FLAC;Player;
+StartupNotify=true
